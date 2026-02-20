@@ -1,0 +1,1255 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0, viewport-fit=cover">
+  <title>接送神隊友 v7</title>
+  <meta name="description" content="家庭接送即時通訊工具 — 買家與司機無縫協調">
+  <meta name="theme-color" content="#0d1117">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="/manifest.json">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0d1117;
+      --text-color: #e6edf3;
+      --primary: #1f6feb;
+      --success: #3fb950;
+      --danger: #ff7b72;
+      --warning: #d29922;
+      --glass-bg: rgba(22, 27, 34, 0.85);
+      --glass-border: rgba(255, 255, 255, 0.08);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--text-color);
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 0.8rem;
+      transition: background 0.8s;
+      overflow-x: hidden;
+    }
+
+    body.state-2 {
+      background: linear-gradient(180deg, #1a0505 0%, #0d1117 100%);
+    }
+
+    body.state-5 {
+      background: linear-gradient(180deg, #1a1505 0%, #0d1117 100%);
+    }
+
+    .container {
+      width: 100%;
+      max-width: 420px;
+      display: flex;
+      flex-direction: column;
+      gap: 0.8rem;
+      align-items: center;
+    }
+
+    /* === Connection Banner === */
+    #connBanner {
+      display: none;
+      width: 100%;
+      padding: 0.6rem;
+      background: rgba(218, 54, 51, 0.3);
+      border: 1px solid var(--danger);
+      border-radius: 10px;
+      text-align: center;
+      font-size: 0.85rem;
+      font-weight: bold;
+      color: var(--danger);
+      animation: blink 1.5s infinite;
+    }
+
+    @keyframes blink {
+      50% {
+        opacity: 0.5;
+      }
+    }
+
+    /* === Role Selector === */
+    .role-wrapper {
+      width: 100%;
+      position: relative;
+    }
+
+    .role-selector {
+      display: flex;
+      gap: 0.5rem;
+      width: 100%;
+      transition: all 0.4s;
+    }
+
+    .role-selector.hidden {
+      max-height: 0;
+      overflow: hidden;
+      opacity: 0;
+      margin: 0;
+      padding: 0;
+    }
+
+    .role-btn {
+      flex: 1;
+      padding: 0.8rem;
+      border-radius: 12px;
+      border: 1px solid var(--glass-border);
+      background: var(--glass-bg);
+      color: var(--text-color);
+      font-size: 1rem;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .role-btn.active {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: #fff;
+    }
+
+    .settings-btn {
+      position: absolute;
+      right: 0;
+      top: -0.3rem;
+      background: none;
+      border: none;
+      font-size: 1.2rem;
+      cursor: pointer;
+      opacity: 0.4;
+    }
+
+    /* === Views === */
+    .view {
+      display: none;
+      width: 100%;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.8rem;
+    }
+
+    .view.active {
+      display: flex;
+    }
+
+    /* === Status Circle === */
+    .status-circle {
+      width: 180px;
+      height: 180px;
+      border-radius: 50%;
+      background: var(--glass-bg);
+      backdrop-filter: blur(15px);
+      border: 2px solid var(--glass-border);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+      transition: all 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      flex-shrink: 0;
+      padding: 1rem;
+      position: relative;
+    }
+
+    .status-icon {
+      font-size: 3.5rem;
+      line-height: 1;
+      margin-bottom: 0.5rem;
+      transition: transform 0.3s;
+    }
+
+    .status-circle:active .status-icon {
+      transform: scale(1.2);
+    }
+
+    .status-text {
+      font-size: 1.2rem;
+      font-weight: 900;
+      line-height: 1.3;
+    }
+
+    .status-msg {
+      font-size: 0.85rem;
+      color: #aaa;
+      margin-top: 0.5rem;
+    }
+
+    @keyframes pulse-danger {
+      0% {
+        box-shadow: 0 0 0 0 rgba(255, 123, 114, 0.6);
+      }
+
+      70% {
+        box-shadow: 0 0 0 50px rgba(255, 123, 114, 0);
+      }
+
+      100% {
+        box-shadow: 0 0 0 0 rgba(255, 123, 114, 0);
+      }
+    }
+
+    @keyframes pulse-warning {
+      0% {
+        box-shadow: 0 0 0 0 rgba(219, 171, 9, 0.6);
+      }
+
+      70% {
+        box-shadow: 0 0 0 40px rgba(219, 171, 9, 0);
+      }
+
+      100% {
+        box-shadow: 0 0 0 0 rgba(219, 171, 9, 0);
+      }
+    }
+
+    .state-2 .status-circle {
+      animation: pulse-danger 1.5s infinite;
+      background: rgba(218, 54, 51, 0.2);
+      border-color: var(--danger);
+      transform: scale(1.05);
+    }
+
+    .state-5 .status-circle {
+      animation: pulse-warning 1.8s infinite;
+      background: rgba(219, 171, 9, 0.2);
+      border-color: var(--warning);
+      transform: scale(1.05);
+    }
+
+    /* === Panels === */
+    .btn-group {
+      width: 100%;
+      background: rgba(0, 0, 0, 0.4);
+      border-radius: 20px;
+      padding: 1rem;
+      border: 1px solid var(--glass-border);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    }
+
+    .btn-group-title {
+      font-size: 0.9rem;
+      color: #8b949e;
+      margin-bottom: 0.8rem;
+      font-weight: bold;
+      text-align: left;
+      opacity: 0.8;
+    }
+
+    .action-btn {
+      width: 100%;
+      padding: 1.1rem;
+      margin-bottom: 0.8rem;
+      border: none;
+      border-radius: 15px;
+      font-size: 1.1rem;
+      font-weight: bold;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.8rem;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      background: rgba(255, 255, 255, 0.08);
+      color: white;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .action-btn:last-child {
+      margin-bottom: 0;
+    }
+
+    .action-btn:active {
+      transform: scale(0.96);
+      filter: brightness(1.2);
+    }
+
+    .action-btn.active-state {
+      box-shadow: 0 0 0 2px white, inset 0 0 15px rgba(255, 255, 255, 0.2) !important;
+      background: rgba(255, 255, 255, 0.2) !important;
+    }
+
+    .btn-danger {
+      background: linear-gradient(135deg, #da3633 0%, #8b1c1a 100%);
+      color: #fff;
+      font-size: 1.25rem;
+      padding: 1.4rem;
+      border-color: #ff7b72;
+    }
+
+    .btn-success {
+      background: linear-gradient(135deg, #2ea043 0%, #155c23 100%);
+      color: #fff;
+    }
+
+    .btn-warning {
+      background: linear-gradient(135deg, #d29922 0%, #815b0b 100%);
+      color: #fff;
+    }
+
+    .eta-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.8rem;
+    }
+
+    .eta-btn {
+      padding: 1.2rem 0.5rem;
+      border-radius: 12px;
+      border: none;
+      background: rgba(88, 166, 255, 0.15);
+      color: #58a6ff;
+      font-weight: bold;
+      font-size: 1.05rem;
+      border: 1px solid rgba(88, 166, 255, 0.3);
+      cursor: pointer;
+      transition: all 0.2s;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .eta-btn:active {
+      background: #58a6ff;
+      color: #000;
+      transform: translateY(2px);
+      box-shadow: none;
+    }
+
+    .nav-btn {
+      grid-column: 1 / -1;
+      background: #2ea043;
+      color: #fff;
+      border-color: #3fb950;
+      font-size: 1.15rem;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .feedback-banner {
+      background: rgba(31, 111, 235, 0.2);
+      border: 1px solid var(--primary);
+      padding: 1rem;
+      border-radius: 15px;
+      text-align: center;
+      font-size: 1.1rem;
+      font-weight: bold;
+      color: var(--text-color);
+      width: 100%;
+      margin: 0 0 0.5rem 0;
+      display: none;
+      backdrop-filter: blur(5px);
+      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+      animation: slideDown 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    .feedback-banner span {
+      color: var(--primary);
+      font-size: 1.3rem;
+    }
+
+    @keyframes slideDown {
+      from {
+        opacity: 0;
+        transform: translateY(-20px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .state-3 .feedback-banner.driver-enroute {
+      display: block;
+    }
+
+    input.text-input {
+      width: 100%;
+      padding: 1rem;
+      background: rgba(0, 0, 0, 0.6);
+      color: white;
+      border: 1px solid #444;
+      border-radius: 12px;
+      font-size: 16px;
+      margin-bottom: 0.8rem;
+      outline: none;
+      transition: 0.3s;
+      box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+    }
+
+    input.text-input:focus {
+      border-color: var(--primary);
+      background: rgba(0, 0, 0, 0.8);
+    }
+
+    .undo-btn {
+      display: none;
+      font-size: 0.9rem;
+      color: #8b949e;
+      background: none;
+      border: none;
+      text-decoration: underline;
+      margin-top: 0.5rem;
+      cursor: pointer;
+    }
+
+    .state-2 .undo-btn {
+      display: inline-block;
+    }
+
+    #confetti {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 100;
+      display: none;
+    }
+
+    /* === Timeline === */
+    .timeline-panel {
+      width: 100%;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 15px;
+      border: 1px solid var(--glass-border);
+      overflow: hidden;
+    }
+
+    .timeline-toggle {
+      background: none;
+      border: none;
+      color: #8b949e;
+      font-size: 0.85rem;
+      padding: 0.6rem 1rem;
+      width: 100%;
+      text-align: left;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    .timeline-list {
+      display: none;
+      max-height: 200px;
+      overflow-y: auto;
+      padding: 0 1rem 0.8rem 1rem;
+    }
+
+    .timeline-list.open {
+      display: block;
+    }
+
+    .timeline-entry {
+      font-size: 0.75rem;
+      color: #8b949e;
+      padding: 0.2rem 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .timeline-entry .t-time {
+      color: #58a6ff;
+      min-width: 50px;
+    }
+
+    /* === Settings Modal === */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-overlay.open {
+      display: flex;
+    }
+
+    .modal-box {
+      background: #161b22;
+      border: 1px solid #333;
+      border-radius: 20px;
+      padding: 1.5rem;
+      width: 90%;
+      max-width: 360px;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+
+    .modal-box h3 {
+      margin-bottom: 1rem;
+      font-size: 1.1rem;
+    }
+
+    .setting-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.8rem 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      font-size: 0.95rem;
+    }
+
+    .toggle-switch {
+      width: 44px;
+      height: 24px;
+      background: #444;
+      border-radius: 12px;
+      position: relative;
+      cursor: pointer;
+      transition: 0.3s;
+      border: none;
+    }
+
+    .toggle-switch.on {
+      background: var(--success);
+    }
+
+    .toggle-switch::after {
+      content: '';
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      background: #fff;
+      border-radius: 50%;
+      top: 3px;
+      left: 3px;
+      transition: 0.3s;
+    }
+
+    .toggle-switch.on::after {
+      left: 23px;
+    }
+
+    .qr-container {
+      text-align: center;
+      margin-top: 1rem;
+    }
+
+    .qr-container img {
+      border-radius: 10px;
+    }
+
+    .qr-url {
+      font-size: 0.7rem;
+      color: #8b949e;
+      margin-top: 0.5rem;
+      word-break: break-all;
+    }
+
+    .modal-close {
+      width: 100%;
+      padding: 0.8rem;
+      margin-top: 1rem;
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      border-radius: 12px;
+      font-size: 1rem;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    /* === Landscape === */
+    @media (orientation: landscape) and (max-height: 500px) {
+      .role-wrapper {
+        margin-bottom: 0.5rem;
+      }
+
+      #driverView {
+        flex-direction: row;
+        align-items: stretch;
+        justify-content: center;
+        height: 100%;
+        gap: 2rem;
+      }
+
+      .status-circle {
+        width: 160px;
+        height: 160px;
+        border-width: 4px;
+      }
+
+      .status-icon {
+        font-size: 2.5rem;
+        margin-bottom: 0px;
+      }
+
+      .status-text {
+        font-size: 1rem;
+      }
+
+      .btn-group {
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+      }
+
+      .eta-grid {
+        flex: 1;
+        display: grid;
+        align-items: center;
+      }
+
+      .eta-btn {
+        padding: 0.8rem;
+      }
+
+      .action-btn {
+        padding: 0.8rem;
+      }
+    }
+  </style>
+</head>
+
+<body onclick="unlockAudio()">
+
+  <canvas id="confetti"></canvas>
+
+  <!-- Connection Banner -->
+  <div id="connBanner">⚠️ 連線中斷，嘗試重新連線中...</div>
+
+  <!-- Settings Modal -->
+  <div class="modal-overlay" id="settingsModal">
+    <div class="modal-box">
+      <h3>⚙️ 設定</h3>
+      <div class="setting-row">
+        <span>🔊 提示音效</span>
+        <button class="toggle-switch on" id="toggleSound" onclick="toggleSetting('sound')"></button>
+      </div>
+      <div class="setting-row">
+        <span>📳 震動提醒</span>
+        <button class="toggle-switch on" id="toggleVibrate" onclick="toggleSetting('vibrate')"></button>
+      </div>
+      <div class="setting-row">
+        <span>🌐 Language</span>
+        <button class="toggle-switch" id="toggleLang" onclick="toggleSetting('lang')"></button>
+      </div>
+      <div class="setting-row" style="flex-direction: column; align-items: flex-start;">
+        <span>🏷️ 自訂快速標籤 (每行一個)</span>
+        <textarea id="customTagsInput" rows="4"
+          style="width:100%; margin-top:0.5rem; background:#0d1117; color:#fff; border:1px solid #444; border-radius:8px; padding:0.5rem; font-size:14px; resize:vertical;"></textarea>
+        <button onclick="saveCustomTags()"
+          style="margin-top:0.5rem; padding:0.4rem 1rem; background:var(--success); color:#fff; border:none; border-radius:8px; font-size:0.85rem; cursor:pointer;">儲存標籤</button>
+      </div>
+      <div class="setting-row" style="flex-direction: column; align-items: flex-start;">
+        <span>📱 QR Code (掃碼加入此頻道)</span>
+        <div class="qr-container" id="qrContainer">載入中...</div>
+      </div>
+      <div class="setting-row" style="flex-direction: column; align-items: flex-start;">
+        <span>📡 頻道 ID</span>
+        <div style="font-size:0.85rem; color:#58a6ff; margin-top:0.3rem;" id="roomDisplay">default</div>
+      </div>
+      <button class="modal-close" onclick="closeSettings()">關閉</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="role-wrapper">
+      <div class="role-selector" id="roleSelector">
+        <button class="role-btn active" onclick="setRole('driver')"><span data-i18n="driver">我是司機 🚙</span></button>
+        <button class="role-btn" onclick="setRole('shopper')"><span data-i18n="shopper">我是買家 🛒</span></button>
+      </div>
+      <button class="settings-btn" onclick="openSettings()">⚙️</button>
+    </div>
+
+    <!-- ================= DRIVER VIEW ================= -->
+    <div id="driverView" class="view active">
+      <div class="status-circle" id="driverStatus">
+        <div class="status-icon" id="d-icon">☕</div>
+        <div class="status-text" id="d-text">衛星點待命</div>
+        <div class="status-msg" id="d-msg"></div>
+      </div>
+
+      <div class="btn-group" id="driverEtaPanel" style="display: none;">
+        <div class="btn-group-title" style="color:var(--danger); font-size:1.1rem;">🚨 呼叫！請操作：</div>
+
+        <button class="action-btn" onclick="openDriverMapOnly()"
+          style="background:var(--success); color:#fff; font-size: 1.3rem; padding: 1.5rem; border: none; box-shadow: 0 4px 15px rgba(63, 185, 80, 0.4); margin-bottom: 1.2rem;">
+          🗺️ 第1步：開啟地圖看時間
+        </button>
+
+        <div class="btn-group-title" style="color:#8b949e;">第2步：看地圖寫幾分，就按幾👇</div>
+        <div class="eta-grid">
+          <button class="eta-btn" onclick="sendDriverMsg(3, 1)">1 分鐘 (門口)</button>
+          <button class="eta-btn" onclick="sendDriverMsg(3, 2)">2 分鐘</button>
+          <button class="eta-btn" onclick="sendDriverMsg(3, 3)">3 分鐘</button>
+          <button class="eta-btn" onclick="sendDriverMsg(3, 5)">5 分鐘</button>
+        </div>
+
+        <div style="margin-top: 1rem; text-align: center;">
+          <div style="color: #555; font-size: 0.85rem; margin-bottom: 0.5rem;">超過5分鐘請微調：</div>
+          <div style="display: flex; gap: 0.5rem; justify-content: center; align-items: stretch;">
+            <div
+              style="display: flex; align-items: center; justify-content: space-between; background: rgba(0, 0, 0, 0.4); border: 1px solid #444; border-radius: 12px; padding: 0.2rem; min-width: 140px;">
+              <button
+                style="border:none;background:rgba(255,255,255,0.1);color:#fff;font-size:1.5rem;width:40px;height:40px;border-radius:10px;cursor:pointer;"
+                onclick="adjustCustomEta(-1)">-</button>
+              <span id="customEtaNumber" style="color:#fff;font-size:1.4rem;font-weight:bold;">6</span>
+              <button
+                style="border:none;background:rgba(255,255,255,0.1);color:#fff;font-size:1.5rem;width:40px;height:40px;border-radius:10px;cursor:pointer;"
+                onclick="adjustCustomEta(1)">+</button>
+            </div>
+            <button class="eta-btn nav-btn"
+              style="flex: 1; margin: 0; background: rgba(88, 166, 255, 0.2); color: #58a6ff; border-color: rgba(88, 166, 255, 0.4);"
+              onclick="sendDriverMsg(3, parseInt(document.getElementById('customEtaNumber').innerText))">送出分鐘</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Reopenable map btn in status 3 -->
+      <div class="btn-group" id="driverMapReopenPanel" style="display: none;">
+        <button class="action-btn" onclick="openDriverMapOnly()"
+          style="background: rgba(63,185,80,0.15); color: #3fb950; border: 1px solid rgba(63,185,80,0.4);">🗺️
+          重新開啟地圖導航</button>
+      </div>
+
+      <div class="btn-group" id="driverActionPanel">
+        <div class="btn-group-title">司機主動回報：</div>
+        <button class="action-btn" onclick="sendDriverMsg(4, '我到了，快出來')">✅ 我已經到門口了</button>
+        <button class="action-btn" onclick="sendDriverMsg(5, '警察趕人，我要繞一圈')">⚠️ 警察趕人/難停，我先繞一圈</button>
+        <button class="action-btn" style="background:rgba(255,255,255,0.05); color:#8b949e; border:none;"
+          onclick="resetAll()">💤 重新設定 (剛到衛星點)</button>
+      </div>
+    </div>
+
+    <!-- ================= SHOPPER VIEW ================= -->
+    <div id="shopperView" class="view">
+
+      <div class="feedback-banner driver-enroute" id="shopperDriverAck">
+        🚙 司機已出發！約 <span id="etaMinutes"></span> 抵達
+      </div>
+      <div class="feedback-banner" id="shopperDriverArrived"
+        style="display:none; background: rgba(63, 185, 80, 0.2); border-color: var(--success);">
+      </div>
+
+      <div class="btn-group">
+        <div class="btn-group-title" style="color:var(--text-color); font-size: 1rem;">📍 1. 會合點特徵 (司機會即時看到)：</div>
+
+        <div id="quickTagContainer" style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.8rem;">
+          <!-- Tags rendered by JS -->
+        </div>
+
+        <div style="position: relative; margin-bottom: 0.5rem;">
+          <input type="text" class="text-input" id="meetPoint" placeholder="點選上方特徵，或在此打字"
+            style="margin-bottom: 0; padding-right: 4.5rem; font-size: 1rem;" onInput="checkMapUrl()" autocomplete="off"
+            autocorrect="off" spellcheck="false" />
+          <div
+            style="position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); display: flex; align-items: center; gap: 0.3rem;">
+            <button id="clearMeetBtn" onclick="clearMeetPoint()"
+              style="display:none; border:none; background:rgba(255,255,255,0.2); color:#fff; width:28px; height:28px; border-radius:50%; font-size:0.9rem; cursor:pointer; align-items:center; justify-content:center;">✖</button>
+            <span id="syncStatus" style="font-size: 1.2rem; display: none;">✅</span>
+          </div>
+        </div>
+
+        <div id="syncHelpText"
+          style="font-size: 0.8rem; color: #8b949e; text-align: center; margin-bottom: 1.2rem; line-height: 1.4;">
+          輸入的文字會自動傳送給司機
+        </div>
+      </div>
+
+      <div class="btn-group">
+        <div class="btn-group-title">進度回報：</div>
+        <button class="action-btn btn-1" id="btn-state-1" onclick="sendShopperMsg(1)">🛒 剛進店裡 / 開始排隊</button>
+        <div style="text-align: center;">
+          <button class="action-btn btn-danger" id="btn-state-2" onclick="sendShopperMsg(2)">🚨 快輪到我了！發車並導航</button>
+          <button class="undo-btn" onclick="sendShopperMsg(1)">← 按錯了，取消呼叫</button>
+        </div>
+        <button class="action-btn btn-success" id="btn-state-4" onclick="sendShopperMsg(4)">✅ 已拿著東西在路邊等</button>
+      </div>
+
+      <div class="btn-group">
+        <div class="btn-group-title">突發狀況求救：</div>
+        <div style="display:flex; gap:0.5rem;">
+          <button class="action-btn btn-warning" style="margin-bottom:0;" onclick="sendShopperMsg(5, '缺貨/看LINE')">💬
+            缺貨/發LINE了</button>
+          <button class="action-btn btn-warning" style="margin-bottom:0;" onclick="sendShopperMsg(5, '卡住，先別來')">⏳
+            結帳卡住</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= TIMELINE ================= -->
+    <div class="timeline-panel">
+      <button class="timeline-toggle" onclick="toggleTimeline()">📋 操作紀錄 ▾</button>
+      <div class="timeline-list" id="timelineList"></div>
+    </div>
+
+  </div>
+
+  <audio id="alertSound" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" preload="auto"
+    loop></audio>
+  <audio id="pingSound" src="https://assets.mixkit.co/active_storage/sfx/2868/2868-preview.mp3" preload="auto"></audio>
+  <audio id="errorSound" src="https://assets.mixkit.co/active_storage/sfx/2955/2955-preview.mp3" preload="auto"></audio>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    // === Room from URL ===
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomId = urlParams.get('room') || 'default';
+
+    const socket = io({ query: { room: roomId } });
+    let currentRole = 'driver';
+    let globalState = { status: 0, eta: null, msg: '', meetPoint: '' };
+    let audioUnlocked = false;
+    let wakeLock = null;
+    let countdownInterval = null;
+    let targetTime = null;
+
+    // === Settings from localStorage ===
+    let settings = JSON.parse(localStorage.getItem('pickupSettings') || '{}');
+    if (settings.sound === undefined) settings.sound = true;
+    if (settings.vibrate === undefined) settings.vibrate = true;
+    if (settings.lang === undefined) settings.lang = 'zh';
+
+    const defaultTags = ['大門口', '原下車處', '旁邊巷口', '對面馬路'];
+    let quickTags = JSON.parse(localStorage.getItem('quickTags') || 'null') || defaultTags;
+
+    const i18n = {
+      zh: { driver: '我是司機 🚙', shopper: '我是買家 🛒', standby: '衛星點待命', preparing: '家人準備中', callout: '家人呼叫！\n請回報時間', enroute: '司機趕路中', done: '任務完成 / 會合', warning: '狀況回報' },
+      en: { driver: 'I\'m Driver 🚙', shopper: 'I\'m Shopper 🛒', standby: 'Standby', preparing: 'Preparing', callout: 'ALERT!\nReport ETA', enroute: 'Driver Enroute', done: 'Meetup / Done', warning: 'Issue Report' }
+    };
+
+    function stateDescText(statusNum) {
+      const lang = settings.lang;
+      const map = {
+        0: { icon: '☕', defaultText: i18n[lang].standby },
+        1: { icon: '🛒', defaultText: i18n[lang].preparing },
+        2: { icon: '🚨', defaultText: i18n[lang].callout },
+        3: { icon: '🚙', defaultText: i18n[lang].enroute },
+        4: { icon: '✨', defaultText: i18n[lang].done },
+        5: { icon: '⚠️', defaultText: i18n[lang].warning }
+      };
+      return map[statusNum] || map[0];
+    }
+
+    // === Init ===
+    function init() {
+      renderQuickTags();
+      applySettings();
+      document.getElementById('roomDisplay').innerText = roomId;
+    }
+
+    function renderQuickTags() {
+      const tagIcons = ['🚪', '🔙', '🛣️', '🚥', '📌', '🏪', '🚏', '🅿️'];
+      const container = document.getElementById('quickTagContainer');
+      container.innerHTML = '';
+      quickTags.forEach((tag, idx) => {
+        const btn = document.createElement('button');
+        btn.className = 'action-btn';
+        btn.style.cssText = 'width: calc(50% - 0.25rem); margin: 0; padding: 0.7rem; font-size: 0.95rem; background: rgba(255,255,255,0.15);';
+        btn.textContent = (tagIcons[idx] || '📌') + ' ' + tag;
+        btn.setAttribute('data-tag', tag);
+        btn.onclick = function () { toggleMeet(tag, this); };
+        container.appendChild(btn);
+      });
+    }
+
+    function applySettings() {
+      document.getElementById('toggleSound').className = 'toggle-switch' + (settings.sound ? ' on' : '');
+      document.getElementById('toggleVibrate').className = 'toggle-switch' + (settings.vibrate ? ' on' : '');
+      document.getElementById('toggleLang').className = 'toggle-switch' + (settings.lang === 'en' ? ' on' : '');
+      // Update i18n labels
+      document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        if (i18n[settings.lang][key]) el.textContent = i18n[settings.lang][key];
+      });
+    }
+
+    function toggleSetting(key) {
+      if (key === 'lang') {
+        settings.lang = settings.lang === 'zh' ? 'en' : 'zh';
+      } else {
+        settings[key] = !settings[key];
+      }
+      localStorage.setItem('pickupSettings', JSON.stringify(settings));
+      applySettings();
+    }
+
+    function saveCustomTags() {
+      const raw = document.getElementById('customTagsInput').value.trim();
+      if (!raw) return;
+      quickTags = raw.split('\n').map(s => s.trim()).filter(s => s.length > 0).slice(0, 8);
+      localStorage.setItem('quickTags', JSON.stringify(quickTags));
+      renderQuickTags();
+      alert('✅ 標籤已更新');
+    }
+
+    function openSettings() {
+      document.getElementById('settingsModal').classList.add('open');
+      document.getElementById('customTagsInput').value = quickTags.join('\n');
+      // Load QR
+      fetch('/api/qrcode?room=' + encodeURIComponent(roomId))
+        .then(r => r.json())
+        .then(data => {
+          document.getElementById('qrContainer').innerHTML = `<img src="${data.qr}" alt="QR" style="width:200px;"><div class="qr-url">${data.url}</div>`;
+        })
+        .catch(() => { document.getElementById('qrContainer').innerHTML = 'QR 產生失敗'; });
+    }
+
+    function closeSettings() { document.getElementById('settingsModal').classList.remove('open'); }
+
+    // === Connection Status ===
+    socket.on('connect', () => { document.getElementById('connBanner').style.display = 'none'; });
+    socket.on('disconnect', () => { document.getElementById('connBanner').style.display = 'block'; });
+    socket.on('reconnect', () => { document.getElementById('connBanner').style.display = 'none'; });
+
+    // === Wake Lock ===
+    async function requestWakeLock() {
+      if ('wakeLock' in navigator) {
+        try {
+          wakeLock = await navigator.wakeLock.request('screen');
+          wakeLock.addEventListener('release', () => console.log('Wake Lock Released'));
+        } catch (err) { console.error(`${err.name}, ${err.message}`); }
+      }
+    }
+    document.addEventListener('visibilitychange', () => { if (wakeLock !== null && document.visibilityState === 'visible') requestWakeLock(); });
+
+    function unlockAudio() {
+      requestWakeLock();
+      if (audioUnlocked) return;
+      const audioEls = ['alertSound', 'pingSound', 'errorSound'].map(id => document.getElementById(id));
+      Promise.all(audioEls.map(a => a.play().catch(() => { }))).then(() => {
+        audioEls.forEach(a => { a.pause(); a.currentTime = 0; });
+        audioUnlocked = true;
+      });
+    }
+
+    function toggleRoleSelector() {
+      const rs = document.getElementById('roleSelector');
+      if (rs.classList.contains('hidden')) rs.classList.remove('hidden');
+      else rs.classList.add('hidden');
+    }
+
+    function setRole(role) {
+      unlockAudio();
+      currentRole = role;
+      document.querySelectorAll('.role-btn').forEach(b => b.classList.remove('active'));
+      event.target.closest('.role-btn').classList.add('active');
+      document.getElementById('driverView').classList.toggle('active', role === 'driver');
+      document.getElementById('shopperView').classList.toggle('active', role === 'shopper');
+      setTimeout(() => { document.getElementById('roleSelector').classList.add('hidden'); }, 500);
+      updateUI();
+    }
+
+    // === Quick Tags ===
+    function toggleMeet(text, btnElement) {
+      const input = document.getElementById('meetPoint');
+      let currentVal = input.value.trim();
+      let parts = currentVal ? currentVal.split(' ') : [];
+      let idx = parts.indexOf(text);
+      if (idx > -1) {
+        parts.splice(idx, 1);
+        btnElement.style.boxShadow = 'none';
+        btnElement.style.border = '1px solid rgba(255,255,255,0.05)';
+      } else {
+        parts.push(text);
+        btnElement.style.boxShadow = 'inset 0 0 0 2px var(--success)';
+        btnElement.style.border = '1px solid var(--success)';
+      }
+      input.value = parts.join(' ');
+      checkMapUrl();
+    }
+
+    function clearMeetPoint() {
+      document.getElementById('meetPoint').value = '';
+      document.querySelectorAll('#quickTagContainer .action-btn').forEach(btn => {
+        btn.style.boxShadow = 'none';
+        btn.style.border = '1px solid rgba(255,255,255,0.05)';
+      });
+      checkMapUrl();
+    }
+
+    function restoreTagHighlights() {
+      const val = document.getElementById('meetPoint').value.trim();
+      const parts = val ? val.split(' ') : [];
+      document.querySelectorAll('#quickTagContainer .action-btn').forEach(btn => {
+        const tag = btn.getAttribute('data-tag');
+        if (parts.includes(tag)) {
+          btn.style.boxShadow = 'inset 0 0 0 2px var(--success)';
+          btn.style.border = '1px solid var(--success)';
+        } else {
+          btn.style.boxShadow = 'none';
+          btn.style.border = '1px solid rgba(255,255,255,0.05)';
+        }
+      });
+    }
+
+    let syncTimeout = null;
+    function checkMapUrl(silent = false) {
+      const input = document.getElementById('meetPoint');
+      const val = input.value.trim();
+      const syncIcon = document.getElementById('syncStatus');
+      const helpText = document.getElementById('syncHelpText');
+      const clearBtn = document.getElementById('clearMeetBtn');
+
+      if (val.length > 0) {
+        input.style.borderColor = 'var(--success)';
+        input.style.boxShadow = 'inset 0 0 10px rgba(63, 185, 80, 0.2)';
+        if (syncIcon) syncIcon.style.display = 'block';
+        if (clearBtn) clearBtn.style.display = 'flex';
+        if (helpText) { helpText.innerText = '✅ 已推播給司機'; helpText.style.color = 'var(--success)'; }
+        if (!silent) {
+          if (syncTimeout) clearTimeout(syncTimeout);
+          syncTimeout = setTimeout(() => { socket.emit('change-state', { meetPoint: val }); }, 800);
+        }
+      } else {
+        input.style.borderColor = '#444';
+        input.style.boxShadow = 'inset 0 2px 4px rgba(0,0,0,0.3)';
+        if (syncIcon) syncIcon.style.display = 'none';
+        if (clearBtn) clearBtn.style.display = 'none';
+        if (helpText) { helpText.innerText = '輸入的文字會自動傳送給司機'; helpText.style.color = '#8b949e'; }
+      }
+    }
+
+    function resetAll() { unlockAudio(); stopAllAudio(); socket.emit('change-state', 0); }
+
+    function sendShopperMsg(status, msg = '') {
+      unlockAudio(); stopAllAudio(); if (settings.sound) playPing();
+      const meetPointInput = document.getElementById('meetPoint').value.trim();
+      const evtMap = { 1: '🛒 進店/排隊', 2: '🚨 呼叫發車', 4: '✅ 已在路邊等', 5: '⚠️ ' + (msg || '狀況') };
+      socket.emit('change-state', { status, msg, eta: null, meetPoint: meetPointInput, timelineEvent: evtMap[status] || '📌 狀態' + status });
+    }
+
+    function adjustCustomEta(change) {
+      const numSpan = document.getElementById('customEtaNumber');
+      let currentVal = parseInt(numSpan.innerText) || 6;
+      currentVal += change;
+      if (currentVal < 1) currentVal = 1;
+      if (currentVal > 120) currentVal = 120;
+      numSpan.innerText = currentVal;
+    }
+
+    function sendDriverMsg(status, etaOrMsg) {
+      unlockAudio(); stopAllAudio(); if (settings.sound) playPing();
+      let payload = { status };
+      if (status === 3) {
+        payload.eta = etaOrMsg;
+        payload.targetTime = Date.now() + (etaOrMsg * 60 * 1000);
+        payload.timelineEvent = `🚙 司機出發 (${etaOrMsg}分)`;
+      }
+      else if (status === 5) { payload.msg = etaOrMsg; payload.timelineEvent = '⚠️ 司機: ' + etaOrMsg; }
+      else if (status === 4) { payload.msg = etaOrMsg; payload.timelineEvent = '✅ 司機已抵達'; }
+      socket.emit('change-state', payload);
+    }
+
+    function openDriverMapOnly() {
+      stopAllAudio();
+      let meet = globalState.meetPoint || '';
+      if (meet.startsWith('http')) { window.open(meet, '_blank'); }
+      else if (meet) {
+        let dest = encodeURIComponent(meet);
+        window.open(`https://www.google.com/maps/dir/?api=1&destination=${dest}&travelmode=driving`, '_blank');
+      } else {
+        alert("家人尚未輸入會合點。");
+      }
+    }
+
+    // === Socket Events ===
+    socket.on('state-update', (s) => {
+      globalState = s;
+
+      if (s.status === 3 && s.targetTime) {
+        targetTime = s.targetTime;
+        if (countdownInterval) clearInterval(countdownInterval);
+        countdownInterval = setInterval(updateCountdown, 1000);
+        updateCountdown();
+      } else {
+        if (countdownInterval) clearInterval(countdownInterval);
+        countdownInterval = null;
+        targetTime = null;
+        const etaEl = document.getElementById('etaMinutes');
+        if (etaEl) etaEl.innerText = '';
+      }
+
+      if (s.status === 4 && s.msg === '我到了，快出來') { fireConfetti(); } else { stopConfetti(); }
+
+      updateUI();
+      handleAudioFeedback();
+    });
+
+    socket.on('timeline-sync', (timeline) => {
+      const list = document.getElementById('timelineList');
+      list.innerHTML = '';
+      timeline.slice().reverse().forEach(entry => {
+        const div = document.createElement('div');
+        div.className = 'timeline-entry';
+        const d = new Date(entry.time);
+        const timeStr = `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+        div.innerHTML = `<span class="t-time">${timeStr}</span><span>${entry.event}</span>`;
+        list.appendChild(div);
+      });
+    });
+
+    function toggleTimeline() {
+      document.getElementById('timelineList').classList.toggle('open');
+    }
+
+    function updateCountdown() {
+      if (!targetTime) return;
+      let diff = targetTime - Date.now();
+      if (diff <= 0) { document.getElementById('etaMinutes').innerText = "即將抵達"; return; }
+      let min = Math.floor(diff / 60000);
+      let sec = Math.floor((diff % 60000) / 1000);
+      let timeStr = `${min} 分 ${sec < 10 ? '0' : ''}${sec} 秒`;
+      document.getElementById('etaMinutes').innerText = timeStr;
+      if (currentRole === 'driver' && globalState.status === 3) {
+        document.getElementById('d-msg').innerText = `倒數: ${timeStr}`;
+      }
+    }
+
+    function playPing() { if (!settings.sound) return; const p = document.getElementById('pingSound'); p.currentTime = 0; p.play().catch(() => { }); }
+    function playError() { if (!settings.sound) return; const p = document.getElementById('errorSound'); p.currentTime = 0; p.play().catch(() => { }); }
+    function stopAllAudio() {
+      ['alertSound', 'pingSound', 'errorSound'].forEach(id => { const a = document.getElementById(id); a.pause(); a.currentTime = 0; });
+    }
+
+    function handleAudioFeedback() {
+      stopAllAudio();
+      const alertEl = document.getElementById('alertSound');
+      if (currentRole === 'driver') {
+        if (globalState.status === 2) {
+          if (settings.sound) alertEl.play().catch(() => { });
+          if (settings.vibrate && navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 500]);
+        } else if (globalState.status === 1 || globalState.status === 4) {
+          if (settings.sound) playPing();
+          if (settings.vibrate && navigator.vibrate) navigator.vibrate([100, 100, 100]);
+        } else if (globalState.status === 5) {
+          if (settings.sound) playError();
+          if (settings.vibrate && navigator.vibrate) navigator.vibrate([500, 200, 500]);
+        }
+      }
+      if (currentRole === 'shopper') {
+        if (globalState.status === 3 || globalState.status === 4) {
+          if (settings.sound) playPing();
+          if (settings.vibrate && navigator.vibrate) navigator.vibrate([300, 100, 300]);
+        } else if (globalState.status === 5) {
+          if (settings.sound) playError();
+          if (settings.vibrate && navigator.vibrate) navigator.vibrate([500, 200, 500]);
+        }
+      }
+    }
+
+    function updateUI() {
+      document.body.className = `state-${globalState.status}`;
+      const info = stateDescText(globalState.status);
+      document.getElementById('d-icon').innerText = info.icon;
+      let driverText = info.defaultText;
+      let driverMsg = '';
+
+      if (globalState.status === 3 && globalState.eta) {
+        driverText = `趕路中\n約 ${globalState.eta} 分鐘`;
+      } else if (globalState.status === 5 && globalState.msg) {
+        driverText = `⚠️ 突發狀況`;
+        driverMsg = globalState.msg;
+      } else if (globalState.status === 4) {
+        if (globalState.msg === '我到了，快出來') {
+          driverText = `✅ 您已抵達\n等待上車`;
+          driverMsg = globalState.msg;
+        } else {
+          driverText = `✅ 家人已在路邊`;
+          driverMsg = "請盡速前往路邊會合";
+        }
+      } else if (globalState.status === 1 || globalState.status === 2) {
+        let locationStr = globalState.meetPoint || '未提供';
+        if (locationStr.startsWith('http')) { locationStr = '(📍附帶 GMap 連結)'; }
+        driverText = (globalState.status === 2 ? '🚨 呼叫前往：' : '家人在：') + '\n' + locationStr;
+      }
+
+      document.getElementById('d-text').innerText = driverText;
+      if (globalState.status !== 3 || !countdownInterval) { document.getElementById('d-msg').innerText = driverMsg; }
+
+      if (globalState.status === 2) {
+        document.getElementById('driverEtaPanel').style.display = 'block';
+        document.getElementById('driverMapReopenPanel').style.display = 'none';
+      } else if (globalState.status === 3) {
+        document.getElementById('driverEtaPanel').style.display = 'none';
+        document.getElementById('driverMapReopenPanel').style.display = 'block';
+      } else {
+        document.getElementById('driverEtaPanel').style.display = 'none';
+        document.getElementById('driverMapReopenPanel').style.display = 'none';
+      }
+
+      document.getElementById('driverActionPanel').style.display = globalState.status !== 2 ? 'block' : 'none';
+
+      if (currentRole === 'shopper') {
+        const arrivedBanner = document.getElementById('shopperDriverArrived');
+        if (globalState.status === 4) {
+          arrivedBanner.style.display = 'block';
+          if (globalState.msg === '我到了，快出來') {
+            arrivedBanner.innerHTML = '✅ 司機已經在門口了！快上車！';
+          } else {
+            arrivedBanner.innerHTML = '✅ 已通知司機您在路邊等待';
+          }
+        } else {
+          arrivedBanner.style.display = 'none';
+        }
+
+        if (globalState.meetPoint && document.getElementById('meetPoint').value === "") {
+          document.getElementById('meetPoint').value = globalState.meetPoint;
+          checkMapUrl(true);
+        }
+        restoreTagHighlights();
+        document.querySelectorAll('#shopperView > .btn-group .action-btn[id]').forEach(b => b.classList.remove('active-state'));
+        const activeBtn = document.getElementById(`btn-state-${globalState.status}`);
+        if (activeBtn) activeBtn.classList.add('active-state');
+      }
+    }
+
+    // === Confetti ===
+    let particles = [];
+    let confettiFrame = null;
+    function fireConfetti() {
+      const cvs = document.getElementById('confetti');
+      const ctx = cvs.getContext('2d');
+      cvs.style.display = 'block';
+      cvs.width = window.innerWidth;
+      cvs.height = window.innerHeight;
+      particles = [];
+      for (let i = 0; i < 100; i++) {
+        particles.push({ x: cvs.width / 2, y: cvs.height / 2, r: Math.random() * 6 + 2, dx: Math.random() * 10 - 5, dy: Math.random() * -10 - 5, color: `hsl(${Math.random() * 360}, 100%, 50%)` });
+      }
+      function draw() {
+        ctx.clearRect(0, 0, cvs.width, cvs.height);
+        particles.forEach(p => {
+          ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 2 * Math.PI); ctx.fillStyle = p.color; ctx.fill();
+          p.x += p.dx; p.y += p.dy; p.dy += 0.2;
+        });
+        confettiFrame = requestAnimationFrame(draw);
+      }
+      draw();
+      setTimeout(stopConfetti, 4000);
+    }
+    function stopConfetti() {
+      cancelAnimationFrame(confettiFrame);
+      document.getElementById('confetti').style.display = 'none';
+    }
+
+    // Boot
+    init();
+  </script>
+</body>
+
+</html>
