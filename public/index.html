@@ -11,8 +11,6 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="manifest" href="/manifest.json">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
     :root {
       --bg: #000;
@@ -584,6 +582,106 @@
       margin-top: 0.3rem;
       word-break: break-all;
     }
+
+    /* Drive Visualization */
+    .drive-viz {
+      background: linear-gradient(180deg, #0a1628 0%, #111 100%);
+      border-radius: 16px;
+      padding: 1.5rem 1.2rem 0.8rem;
+      margin-bottom: 0.8rem;
+      border: 1px solid #1e3a5f;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .drive-viz::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: radial-gradient(ellipse at 80% 50%, rgba(6, 193, 103, 0.08) 0%, transparent 60%);
+      pointer-events: none;
+    }
+
+    .drive-road {
+      position: relative;
+      height: 56px;
+      display: flex;
+      align-items: center;
+    }
+
+    .drive-dashes {
+      position: absolute;
+      top: 50%;
+      left: 40px;
+      right: 40px;
+      height: 2px;
+      background: repeating-linear-gradient(90deg, #2a4a6a 0px, #2a4a6a 12px, transparent 12px, transparent 24px);
+      animation: dashMove 1.5s linear infinite;
+    }
+
+    @keyframes dashMove {
+      0% {
+        background-position: 0 0;
+      }
+
+      100% {
+        background-position: -24px 0;
+      }
+    }
+
+    .drive-car {
+      position: absolute;
+      font-size: 2.4rem;
+      left: 10%;
+      z-index: 2;
+      filter: drop-shadow(0 0 12px rgba(6, 193, 103, 0.4));
+      transition: left 1s ease-in-out;
+      animation: carBounce 2s ease-in-out infinite;
+    }
+
+    @keyframes carBounce {
+
+      0%,
+      100% {
+        transform: translateY(0);
+      }
+
+      50% {
+        transform: translateY(-3px);
+      }
+    }
+
+    .drive-pin {
+      position: absolute;
+      right: 8px;
+      font-size: 2rem;
+      z-index: 2;
+      animation: pinPulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pinPulse {
+
+      0%,
+      100% {
+        transform: scale(1);
+      }
+
+      50% {
+        transform: scale(1.15);
+      }
+    }
+
+    .drive-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.7rem;
+      color: #4a7a9a;
+      margin-top: 0.3rem;
+      padding: 0 0.2rem;
+    }
   </style>
 </head>
 
@@ -667,23 +765,30 @@
     </div>
 
     <div class="step" id="r2">
-      <!-- Live Location from driver -->
-      <div id="liveLocBox"
-        style="display:none;width:100%;border-radius:16px;overflow:hidden;margin-bottom:0.8rem;background:#111;border:1px solid #2a2a2a;">
-        <a id="liveLocLink" href="#" target="_blank"
-          style="display:flex;align-items:center;gap:0.8rem;padding:1rem;text-decoration:none;color:#fff;">
-          <span style="font-size:2rem;">📍</span>
-          <div>
-            <div style="font-weight:700;font-size:0.95rem;">查看司機即時位置</div>
-            <div style="font-size:0.75rem;color:var(--green);">點擊開啟 Google Maps</div>
-          </div>
-          <span style="margin-left:auto;font-size:1.2rem;">→</span>
-        </a>
+      <!-- Animated Car Approaching Visualization -->
+      <div class="drive-viz">
+        <div class="drive-road">
+          <div class="drive-dashes"></div>
+          <div class="drive-car" id="driveCar">🚗</div>
+          <div class="drive-pin">📍</div>
+        </div>
+        <div class="drive-labels">
+          <span>司機出發</span>
+          <span id="r2MeetLabel">會合點</span>
+        </div>
       </div>
+
       <div class="eta-big">
         <div class="eta-num" id="rEta">—</div>
         <div class="eta-label">預計抵達</div>
       </div>
+
+      <!-- Google Maps link (if driver shared) -->
+      <a class="btn btn-blue" id="gmapLink" href="#" target="_blank"
+        style="display:none;text-decoration:none;margin-bottom:0.5rem;">
+        📍 查看司機即時位置 (Google Maps)
+      </a>
+
       <div class="info-row"><span class="info-icon">📍</span>
         <div>
           <div class="info-label">會合點</div>
@@ -853,7 +958,7 @@
         switch (gs.status) {
           case 0: em.textContent = '🛒'; em.classList.remove('pulse'); hd.textContent = '準備好了嗎？'; sb.textContent = '設定會合點後呼叫接送'; show('r0'); if (gs.meetPoint && !document.getElementById('meetPt').value) { document.getElementById('meetPt').value = gs.meetPoint; onMeet(); } break;
           case 2: em.textContent = '📡'; em.classList.add('pulse'); hd.textContent = '已呼叫接送'; sb.textContent = '等待司機確認中...'; document.getElementById('r1Meet').textContent = meet; show('r1'); break;
-          case 3: em.textContent = '🚙'; em.classList.add('pulse'); hd.textContent = gs.eta ? '司機正在前往' : '司機已接受'; sb.textContent = gs.eta ? `預計 ${gs.eta} 分鐘抵達` : '正在確認路線...'; document.getElementById('r2Meet').textContent = meet; show('r2'); setTimeout(() => { initMap(); if (liveMap) liveMap.invalidateSize(); }, 300); break;
+          case 3: em.textContent = '🚙'; em.classList.add('pulse'); hd.textContent = gs.eta ? '司機正在前往' : '司機已接受'; sb.textContent = gs.eta ? `預計 ${gs.eta} 分鐘抵達` : '正在確認路線...'; document.getElementById('r2Meet').textContent = meet; document.getElementById('r2MeetLabel').textContent = meet; show('r2'); updateCarPosition(); break;
           case 4: em.textContent = '🎉'; em.classList.remove('pulse'); if (gs.msg === '我到了，快出來') { hd.textContent = '司機已到達！'; sb.textContent = '快上車！'; document.getElementById('r3Title').textContent = '🎉 司機已在會合點等您！'; } else { hd.textContent = '已通知司機'; sb.textContent = '您正在路邊等待'; document.getElementById('r3Title').textContent = '✅ 已通知司機您在路邊等待'; } show('r3'); break;
           case 5: em.textContent = '⚠️'; em.classList.add('pulse'); hd.textContent = '狀況回報'; sb.textContent = gs.msg || '請稍候'; show('r1'); break;
           default: show('r0');
@@ -883,16 +988,38 @@
       alert('✅ 已傳送給乘客！');
     }
 
-    // Rider: show live location link when available
+    // Car animation: position based on ETA remaining
+    function updateCarPosition() {
+      const car = document.getElementById('driveCar');
+      if (!car) return;
+      if (!tgtTime || !gs.eta) {
+        car.style.left = '10%';
+        return;
+      }
+      const total = gs.eta * 60000;
+      const remaining = Math.max(0, tgtTime - Date.now());
+      const progress = 1 - (remaining / total);
+      // Car goes from 10% to 75% (pin is at ~85%)
+      const pos = 10 + (progress * 65);
+      car.style.left = Math.min(pos, 75) + '%';
+    }
+
+    // Update car position every second along with the countdown
+    const _origUpdCD = updCD;
+    updCD = function () {
+      _origUpdCD();
+      if (role === 'rider') updateCarPosition();
+    };
+
+    // Show Google Maps link when driver shares
     socket.on('state-update', (s) => {
       if (role === 'rider') {
-        const box = document.getElementById('liveLocBox');
-        const link = document.getElementById('liveLocLink');
-        if (box && link && s.liveMapUrl) {
-          box.style.display = 'block';
+        const link = document.getElementById('gmapLink');
+        if (link && s.liveMapUrl) {
           link.href = s.liveMapUrl;
-        } else if (box) {
-          box.style.display = 'none';
+          link.style.display = 'flex';
+        } else if (link) {
+          link.style.display = 'none';
         }
       }
     });

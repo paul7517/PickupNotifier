@@ -2,4 +2,7 @@ node_modules/
 package-lock.json
 *.pem
 *.key
-ca.crtv
+ca.crt
+ca.key
+cert.pem
+key.pem

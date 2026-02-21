@@ -1,0 +1,10 @@
+version: '3'
+services:
+  pickup:
+    build: .
+    container_name: pickup-notifier
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    environment:
+      - NODE_ENV=production
