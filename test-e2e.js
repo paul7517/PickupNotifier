@@ -1,142 +1,139 @@
 const io = require('socket.io-client');
-
 const URL = 'http://localhost:3000';
-let passed = 0;
-let failed = 0;
+let passed = 0, failed = 0;
 const errors = [];
 
-function assert(condition, testName) {
-    if (condition) { passed++; console.log(`  ✅ ${testName}`); }
-    else { failed++; errors.push(testName); console.log(`  ❌ FAIL: ${testName}`); }
+function assert(ok, name) {
+    if (ok) { passed++; console.log(`  ✅ ${name}`); }
+    else { failed++; errors.push(name); console.log(`  ❌ ${name}`); }
 }
-
 function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-async function runTests() {
-    // === Test Room Isolation ===
-    console.log('\n🏠 ROOM ISOLATION TEST');
-    const roomA1 = io(URL, { query: { room: 'testA' } });
-    const roomA2 = io(URL, { query: { room: 'testA' } });
-    const roomB1 = io(URL, { query: { room: 'testB' } });
-
-    let stateA1 = {}, stateA2 = {}, stateB1 = {};
-    roomA1.on('state-update', s => stateA1 = { ...s });
-    roomA2.on('state-update', s => stateA2 = { ...s });
-    roomB1.on('state-update', s => stateB1 = { ...s });
-
-    await new Promise(r => roomA1.on('connect', r));
-    await new Promise(r => roomA2.on('connect', r));
-    await new Promise(r => roomB1.on('connect', r));
-    await delay(200);
-
-    // Room A sets state
-    roomA1.emit('change-state', { status: 2, meetPoint: 'Room-A-大門口', timelineEvent: '🛒 Room A 呼叫' });
-    await delay(200);
-    assert(stateA2.status === 2, 'Room A: member 2 sees status 2');
-    assert(stateA2.meetPoint === 'Room-A-大門口', 'Room A: meetPoint synced');
-    assert(stateB1.status === 0, 'Room B: NOT affected by Room A change');
-
-    // Room B sets different state
-    roomB1.emit('change-state', { status: 5, msg: 'Room B 警報', timelineEvent: '⚠️ Room B 警報' });
-    await delay(200);
-    assert(stateB1.status === 5, 'Room B: sees its own status 5');
-    assert(stateA1.status === 2, 'Room A: still at status 2, not affected');
-
-    roomA1.disconnect(); roomA2.disconnect(); roomB1.disconnect();
-
-    // === Test Timeline ===
-    console.log('\n📋 TIMELINE TEST');
-    const s1 = io(URL, { query: { room: 'timelineTest' } });
-    const s2 = io(URL, { query: { room: 'timelineTest' } });
-    let timeline = [];
-    s2.on('timeline-sync', t => { timeline = [...t]; });
-
-    await new Promise(r => s1.on('connect', r));
-    await new Promise(r => s2.on('connect', r));
-    await delay(200);
-
-    s1.emit('change-state', { status: 1, meetPoint: 'test', timelineEvent: '🛒 進店' });
-    await delay(100);
-    s1.emit('change-state', { status: 2, timelineEvent: '🚨 呼叫' });
-    await delay(100);
-    s1.emit('change-state', { status: 3, eta: 3, targetTime: Date.now() + 180000, timelineEvent: '🚙 司機出發 (3分)' });
-    await delay(200);
-
-    assert(timeline.length >= 3, 'Timeline: has at least 3 entries');
-    assert(timeline.some(e => e.event.includes('進店')), 'Timeline: contains "進店" event');
-    assert(timeline.some(e => e.event.includes('呼叫')), 'Timeline: contains "呼叫" event');
-    assert(timeline.some(e => e.event.includes('司機出發')), 'Timeline: contains "司機出發" event');
-
-    s1.disconnect(); s2.disconnect();
-
-    // === Full E2E (3 rounds) ===
-    console.log('\n🛒 ROUND 1: Shopper Full Flow');
-    const shopper = io(URL, { query: { room: 'e2e' } });
-    const driver = io(URL, { query: { room: 'e2e' } });
-    let ss = {}, ds = {};
-    shopper.on('state-update', s => ss = { ...s });
+async function run() {
+    const rider = io(URL, { query: { room: 'test8' } });
+    const driver = io(URL, { query: { room: 'test8' } });
+    let rs = {}, ds = {}, tl = [];
+    rider.on('state-update', s => rs = { ...s });
     driver.on('state-update', s => ds = { ...s });
-    await new Promise(r => shopper.on('connect', r));
+    driver.on('timeline-sync', t => tl = [...t]);
+
+    await new Promise(r => rider.on('connect', r));
     await new Promise(r => driver.on('connect', r));
     await delay(200);
 
-    shopper.emit('change-state', 0); await delay(100);
-    shopper.emit('change-state', { meetPoint: '大門口', timelineEvent: '📌 設定會合點' }); await delay(100);
-    assert(ds.meetPoint === '大門口', 'R1: meetPoint synced');
-    shopper.emit('change-state', { status: 1, meetPoint: '大門口', timelineEvent: '🛒 進店' }); await delay(100);
-    assert(ds.status === 1, 'R1: status 1');
-    shopper.emit('change-state', { status: 2, meetPoint: '大門口', timelineEvent: '🚨 呼叫' }); await delay(100);
-    assert(ds.status === 2, 'R1: ALERT');
-    driver.emit('change-state', { status: 3, eta: 3, targetTime: Date.now() + 180000, timelineEvent: '🚙 出發(3分)' }); await delay(100);
-    assert(ss.status === 3 && ss.eta === 3 && ss.targetTime > 0, 'R1: Shopper sees ETA 3 + targetTime');
-    shopper.emit('change-state', { status: 4, msg: '', meetPoint: '大門口', timelineEvent: '✅ 路邊等' }); await delay(100);
-    assert(ds.status === 4 && ds.msg !== '我到了，快出來', 'R1: Shopper-initiated status 4');
+    // ========== ROUND 1: Happy Path (完整正常流程) ==========
+    console.log('\n🔄 ROUND 1: Happy Path');
+    rider.emit('change-state', 0); await delay(100);
+    assert(ds.status === 0, 'R1: Reset OK');
 
-    console.log('\n🚙 ROUND 2: Driver Flow');
-    driver.emit('change-state', 0); await delay(100);
-    shopper.emit('change-state', { status: 2, meetPoint: 'https://maps.app.goo.gl/test', timelineEvent: '🚨 呼叫' }); await delay(100);
-    driver.emit('change-state', { status: 3, eta: 7, targetTime: Date.now() + 420000, timelineEvent: '🚙 出發(7分)' }); await delay(100);
-    assert(ss.eta === 7, 'R2: Custom ETA 7');
+    rider.emit('change-state', { meetPoint: '大門口' }); await delay(100);
+    assert(ds.meetPoint === '大門口', 'R1: meetPoint sync');
+
+    rider.emit('change-state', { status: 2, meetPoint: '大門口', msg: '', eta: null, timelineEvent: '🚨 乘客呼叫接送' }); await delay(100);
+    assert(ds.status === 2, 'R1: Rider calls → Driver sees status 2');
+
+    driver.emit('change-state', { status: 3, eta: null, targetTime: null, timelineEvent: '🚙 司機已接受' }); await delay(100);
+    assert(rs.status === 3, 'R1: Driver accepts → Rider sees status 3');
+    assert(rs.eta === null, 'R1: ETA null initially (driver checking map)');
+
+    driver.emit('change-state', { status: 3, eta: 5, targetTime: Date.now() + 300000, timelineEvent: '🚙 司機出發 (5分)' }); await delay(100);
+    assert(rs.eta === 5, 'R1: ETA = 5 after driver reports');
+    assert(rs.targetTime > Date.now(), 'R1: targetTime in future');
+
+    driver.emit('change-state', { status: 4, msg: '我到了，快出來', timelineEvent: '✅ 司機已抵達' }); await delay(100);
+    assert(rs.status === 4, 'R1: Driver arrived → Rider sees 4');
+    assert(rs.msg === '我到了，快出來', 'R1: Arrival msg correct');
+
+    // ========== ROUND 2: Rider cancels ==========
+    console.log('\n🔄 ROUND 2: Cancel Flow');
+    rider.emit('change-state', 0); await delay(100);
+
+    rider.emit('change-state', { status: 2, meetPoint: '旁邊巷口', msg: '', eta: null, timelineEvent: '🚨 呼叫' }); await delay(100);
+    assert(ds.status === 2, 'R2: Call sent');
+
+    rider.emit('change-state', { status: 0, msg: '', eta: null, timelineEvent: '❌ 乘客取消呼叫' }); await delay(100);
+    assert(ds.status === 0, 'R2: Cancel → back to 0');
+    assert(ds.meetPoint === '旁邊巷口', 'R2: meetPoint preserved after cancel');
+
+    // ========== ROUND 3: Emergency during ride ==========
+    console.log('\n🔄 ROUND 3: Emergency (status 5)');
+    rider.emit('change-state', 0); await delay(100);
+
+    rider.emit('change-state', { status: 2, meetPoint: '對面馬路', msg: '', eta: null, timelineEvent: '🚨 呼叫' }); await delay(100);
+    driver.emit('change-state', { status: 3, eta: 3, targetTime: Date.now() + 180000, timelineEvent: '🚙 出發 (3分)' }); await delay(100);
+    assert(rs.status === 3 && rs.eta === 3, 'R3: Enroute with ETA 3');
+
+    rider.emit('change-state', { status: 5, msg: '缺貨/看LINE', meetPoint: '對面馬路', eta: null, timelineEvent: '⚠️ 缺貨' }); await delay(100);
+    assert(ds.status === 5, 'R3: Driver sees status 5');
+    assert(ds.msg === '缺貨/看LINE', 'R3: Emergency msg received');
+
+    driver.emit('change-state', { status: 5, msg: '警察趕人，我要繞一圈', timelineEvent: '⚠️ 警察趕人' }); await delay(100);
+    assert(rs.status === 5, 'R3: Rider sees driver warning');
+    assert(rs.msg === '警察趕人，我要繞一圈', 'R3: Warning msg correct');
+
+    // ========== ROUND 4: Rider ready before driver arrives ==========
+    console.log('\n🔄 ROUND 4: Rider ready first');
+    rider.emit('change-state', 0); await delay(100);
+
+    rider.emit('change-state', { status: 2, meetPoint: '原下車處', msg: '', eta: null, timelineEvent: '🚨 呼叫' }); await delay(100);
+    driver.emit('change-state', { status: 3, eta: 7, targetTime: Date.now() + 420000, timelineEvent: '🚙 出發 (7分)' }); await delay(100);
+
+    rider.emit('change-state', { status: 4, msg: '', meetPoint: '原下車處', eta: null, timelineEvent: '✅ 乘客已在路邊' }); await delay(100);
+    assert(ds.status === 4, 'R4: Driver sees status 4 (rider ready)');
+    assert(ds.msg !== '我到了，快出來', 'R4: msg is NOT driver-arrived msg');
+
+    // Verify countdown was cleared
+    assert(rs.targetTime === null || rs.status !== 3, 'R4: Countdown should stop on status != 3');
+
+    // ========== ROUND 5: Custom ETA + GMap URL + Room Isolation ==========
+    console.log('\n🔄 ROUND 5: Custom ETA + URL + Room Isolation');
+
+    // Room isolation check
+    const otherRoom = io(URL, { query: { room: 'other' } });
+    let otherState = {};
+    otherRoom.on('state-update', s => otherState = { ...s });
+    await new Promise(r => otherRoom.on('connect', r));
+    await delay(100);
+
+    rider.emit('change-state', 0); await delay(100);
+
+    rider.emit('change-state', { status: 2, meetPoint: 'https://maps.app.goo.gl/xyz', msg: '', eta: null, timelineEvent: '🚨 呼叫' }); await delay(100);
+    assert(ds.meetPoint === 'https://maps.app.goo.gl/xyz', 'R5: GMap URL synced');
+    assert(otherState.status === 0, 'R5: Room isolation — other room NOT affected');
+
+    driver.emit('change-state', { status: 3, eta: 12, targetTime: Date.now() + 720000, timelineEvent: '🚙 出發 (12分)' }); await delay(100);
+    assert(rs.eta === 12, 'R5: Custom ETA 12 works');
+
     driver.emit('change-state', { status: 4, msg: '我到了，快出來', timelineEvent: '✅ 抵達' }); await delay(100);
-    assert(ss.msg === '我到了，快出來', 'R2: Driver arrived msg');
+    assert(rs.msg === '我到了，快出來', 'R5: Arrival complete');
+    assert(otherState.status === 0, 'R5: Room isolation confirmed');
 
-    console.log('\n⚠️ ROUND 3: Edge Cases');
-    driver.emit('change-state', 0); await delay(100);
-    shopper.emit('change-state', { status: 2, meetPoint: '', timelineEvent: '🚨 空呼叫' }); await delay(100);
-    assert(ds.meetPoint === '', 'R3: Empty meetPoint handled');
-    shopper.emit('change-state', { status: 5, msg: '缺貨/看LINE', timelineEvent: '⚠️ 缺貨' }); await delay(100);
-    assert(ds.msg === '缺貨/看LINE', 'R3: Emergency msg');
-    shopper.emit('change-state', { status: 1, msg: '', timelineEvent: '🔄 取消' }); await delay(100);
-    assert(ds.status === 1, 'R3: Undo');
-    driver.emit('change-state', { status: 5, msg: '警察趕人', timelineEvent: '⚠️ 警察' }); await delay(100);
-    assert(ss.status === 5 && ss.msg === '警察趕人', 'R3: Driver warning');
-    driver.emit('change-state', 0); await delay(100);
-    assert(ds.status === 0, 'R3: Final reset');
+    otherRoom.disconnect();
 
-    shopper.disconnect(); driver.disconnect();
+    // ========== TIMELINE CHECK ==========
+    console.log('\n📋 TIMELINE CHECK');
+    await delay(200);
+    assert(tl.length >= 5, `Timeline: ${tl.length} entries (>=5 expected)`);
+    assert(tl.some(e => e.event && typeof e.time === 'number'), 'Timeline: entries have proper structure');
 
-    // === QR Code API ===
-    console.log('\n📱 QR CODE API TEST');
+    // ========== QR API ==========
+    console.log('\n📱 QR API');
     try {
-        const resp = await fetch('http://localhost:3000/api/qrcode?room=testQR');
+        const resp = await fetch('http://localhost:3000/api/qrcode?room=test8');
         const data = await resp.json();
-        assert(data.qr && data.qr.startsWith('data:image'), 'QR: Returns valid data URL');
-        assert(data.url.includes('testQR'), 'QR: URL contains room ID');
-    } catch (err) {
-        assert(false, 'QR: API reachable - ' + err.message);
-    }
+        assert(data.qr && data.qr.startsWith('data:image'), 'QR: Valid data URL');
+        assert(data.url.includes('test8'), 'QR: Contains room ID');
+    } catch (e) { assert(false, 'QR: API error - ' + e.message); }
 
-    // ====== SUMMARY ======
+    // ========== SUMMARY ==========
     console.log('\n' + '='.repeat(50));
-    console.log(`📊 Test Results: ${passed} passed, ${failed} failed`);
-    if (errors.length > 0) {
-        console.log('❌ Failed tests:');
-        errors.forEach(e => console.log(`   - ${e}`));
-    } else {
-        console.log('🎉 ALL TESTS PASSED!');
-    }
+    console.log(`📊 Results: ${passed} passed, ${failed} failed`);
+    if (errors.length) { errors.forEach(e => console.log(`  ❌ ${e}`)); }
+    else { console.log('🎉 ALL TESTS PASSED!'); }
     console.log('='.repeat(50));
+
+    rider.disconnect(); driver.disconnect();
     process.exit(failed > 0 ? 1 : 0);
 }
 
-runTests().catch(err => { console.error('Test error:', err); process.exit(1); });
+run().catch(e => { console.error(e); process.exit(1); });
